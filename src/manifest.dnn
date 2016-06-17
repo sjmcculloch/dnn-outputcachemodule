@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<dotnetnuke type="Package" version="6.0">
+  <packages>
+    <package name="Ventrian.HttpModules.OutputCaching" type="Library" version="1.0.0">
+      <friendlyName>OutputCaching (Browser Ignore)</friendlyName>
+      <description></description>
+      <owner>
+        <name>Scott McCulloch</name>
+        <organization>Ventrian</organization>
+        <url>http://www.ventrian.com</url>
+        <email><![CDATA[<a href="mailto:support@ventrian.com">support@ventrian.com</a>]]></email>
+      </owner>
+      <releaseNotes src="ReleaseNotes.txt" />
+      <dependencies>
+        <dependency type="CoreVersion">08.00.00</dependency>
+      </dependencies>
+      <components>
+        <component type="Assembly">
+          <assemblies>
+            <assembly>
+              <path>bin</path>
+              <name>Ventrian.HttpModules.OutputCaching.dll</name>
+            </assembly>
+          </assemblies>
+        </component>
+      </components>
+    </package>
+  </packages>
+</dotnetnuke>

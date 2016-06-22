@@ -2,7 +2,6 @@
 using DotNetNuke.Entities.Portals;
 using DotNetNuke.Entities.Tabs;
 using DotNetNuke.Services.Installer.Blocker;
-using DotNetNuke.Services.Localization;
 using DotNetNuke.Services.OutputCache;
 using System;
 using System.Collections;
@@ -33,10 +32,7 @@ namespace Ventrian.HttpModules.OutputCaching
             httpApp.UpdateRequestCache += OnUpdateRequestCache;
         }
 
-
-        public void Dispose()
-        {
-        }
+        public void Dispose() {}
 
         #endregion
 
@@ -50,19 +46,13 @@ namespace Ventrian.HttpModules.OutputCaching
             bool cached = false;
             if ((_app == null) || (_app.Context == null) || (_app.Context.Items == null) || _app.Response.ContentType.ToLower() != "text/html" || _app.Context.Request.IsAuthenticated ||
                 HttpContext.Current.Request.Browser.Crawler)
-            {
                 return;
-            }
 
             if (IsInstallInProgress(_app))
-            {
                 return;
-            }
 
             if (_app.Context.Request.RequestType == "POST" || !(_app.Context.Request.Url.LocalPath.ToLower().EndsWith(Globals.glbDefaultPage.ToLower())))
-            {
                 return;
-            }
 
             var settings = ConfigurationManager.AppSettings;
             if (settings[OutputCacheSkipBrowsers] != null)
@@ -95,49 +85,44 @@ namespace Ventrian.HttpModules.OutputCaching
                 }
             }
 
+            _app.Context.Response.AddHeader("OnResolveRequestCache", "OnResolveRequestCache");
+
             var portalSettings = (PortalSettings)(HttpContext.Current.Items["PortalSettings"]);
             int tabId = portalSettings.ActiveTab.TabID;
 
             Hashtable tabSettings = TabController.Instance.GetTabSettings(tabId);
 
             if (tabSettings["CacheProvider"] == null || string.IsNullOrEmpty(tabSettings["CacheProvider"].ToString()))
-            {
                 return;
-            }
 
             int portalId = portalSettings.PortalId;
-            string locale = Localization.GetPageLocale(portalSettings).Name;
+
+            string locale = "";
+            if( _app.Request.QueryString["language"] != null )
+                locale = _app.Request.QueryString["language"];
 
             IncludeExcludeType includeExclude = IncludeExcludeType.ExcludeByDefault;
             if (tabSettings["CacheIncludeExclude"] != null && !string.IsNullOrEmpty(tabSettings["CacheIncludeExclude"].ToString()))
             {
                 if (tabSettings["CacheIncludeExclude"].ToString() == "0")
-                {
                     includeExclude = IncludeExcludeType.ExcludeByDefault;
-                }
                 else
-                {
                     includeExclude = IncludeExcludeType.IncludeByDefault;
-                }
             }
-
 
             string tabOutputCacheProvider = tabSettings["CacheProvider"].ToString();
             _app.Context.Items[ContextKeyTabOutputCacheProvider] = tabOutputCacheProvider;
+
             int maxCachedVariationsForTab = 250; //by default, prevent DOS attacks
             if (tabSettings["MaxVaryByCount"] != null && !string.IsNullOrEmpty(tabSettings["MaxVaryByCount"].ToString()))
-            {
                 maxCachedVariationsForTab = Convert.ToInt32(tabSettings["MaxVaryByCount"].ToString());
-            }
 
             var includeVaryByKeys = new StringCollection();
             includeVaryByKeys.Add("ctl");
             includeVaryByKeys.Add("returnurl");
             includeVaryByKeys.Add("tabid");
             includeVaryByKeys.Add("portalid");
-            includeVaryByKeys.Add("locale");
             includeVaryByKeys.Add("alias");
-            //make sure to always add keys in lowercase only
 
             if (includeExclude == IncludeExcludeType.ExcludeByDefault)
             {
@@ -153,9 +138,7 @@ namespace Ventrian.HttpModules.OutputCaching
                     {
                         string[] keys = includeVaryByKeysSettings.Split(char.Parse(","));
                         foreach (string key in keys)
-                        {
                             includeVaryByKeys.Add(key.Trim().ToLower());
-                        }
                     }
                     else
                     {
@@ -163,14 +146,13 @@ namespace Ventrian.HttpModules.OutputCaching
                     }
                 }
             }
+
             var excludeVaryByKeys = new StringCollection();
             if (includeExclude == IncludeExcludeType.IncludeByDefault)
             {
                 string excludeVaryByKeysSettings = string.Empty;
                 if (tabSettings["ExcludeVaryBy"] != null)
-                {
                     excludeVaryByKeysSettings = tabSettings["ExcludeVaryBy"].ToString();
-                }
 
                 if (!string.IsNullOrEmpty(excludeVaryByKeysSettings))
                 {
@@ -197,22 +179,11 @@ namespace Ventrian.HttpModules.OutputCaching
                     varyBy.Add(key.ToLower(), _app.Context.Request.QueryString[key]);
             }
             if (!(varyBy.ContainsKey("portalid")))
-            {
                 varyBy.Add("portalid", portalId.ToString());
-            }
             if (!(varyBy.ContainsKey("tabid")))
-            {
                 varyBy.Add("tabid", tabId.ToString());
-            }
-            if (!(varyBy.ContainsKey("locale")))
-            {
-                varyBy.Add("locale", locale);
-            }
             if (!(varyBy.ContainsKey("alias")))
-            {
                 varyBy.Add("alias", portalSettings.PortalAlias.HTTPAlias);
-            }
-
 
             string cacheKey = OutputCachingProvider.Instance(tabOutputCacheProvider).GenerateCacheKey(tabId, includeVaryByKeys, excludeVaryByKeys, varyBy);
 
@@ -220,19 +191,22 @@ namespace Ventrian.HttpModules.OutputCaching
 
             if (returnedFromCache)
             {
+
                 //output the content type heade when read content from cache.
                 _app.Context.Response.AddHeader("Content-Type", string.Format("{0}; charset={1}", _app.Response.ContentType, _app.Response.Charset));
+                    
                 //This is to give a site owner the ability
                 //to visually verify that a page was rendered via
                 //the output cache.  Use FireFox FireBug or another
                 //tool to view the response headers easily.
                 _app.Context.Response.AddHeader("DNNOutputCache", "true");
 
-                //Also add it ti the Context - the Headers are readonly unless using IIS in Integrated Pipleine mode
+                //Also add it to the Context - the Headers are readonly unless using IIS in Integrated Pipleine mode
                 //and we need to know if OutPut Caching is active in the compression module
                 _app.Context.Items.Add("DNNOutputCache", "true");
 
-                _app.Context.Response.End();
+                _app.Response.End(); // Causes ASP.NET to bypass all events and filtering in the HTTP pipeline chain of execution and directly execute the EndRequest event.
+
                 cached = true;
             }
 
@@ -272,8 +246,8 @@ namespace Ventrian.HttpModules.OutputCaching
 
         private enum IncludeExcludeType
         {
-            IncludeByDefault,
-            ExcludeByDefault
+            ExcludeByDefault,
+            IncludeByDefault
         }
 
         #endregion
